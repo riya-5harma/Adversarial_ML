@@ -1,67 +1,49 @@
-
 import numpy as np
+from tensorflow.keras.datasets import mnist
 import tensorflow as tf
-from tensorflow.keras import datasets
-tf.enable_eager_execution()
-# Load the dataset (e.g., MNIST)
-(train_images, train_labels), (test_images, test_labels) = datasets.mnist.load_data()
+from art.attacks.evasion import FastGradientMethod
+from art.estimators.classification import KerasClassifier
 
-# Normalize the pixel values between 0 and 1
-train_images = train_images / 255.0
-test_images = test_images / 255.0
+tf.compat.v1.disable_eager_execution()
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+# Normalize pixel values to the range [0, 1]
+x_train = x_train / 255.0
+x_test = x_test / 255.0
 
-# Create and train a base model
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Flatten(input_shape=(28, 28)),
+# Reshape the data to match the input shape expected by ART (batch size, width, height, channels)
+x_train = np.reshape(x_train, (x_train.shape[0], 28, 28, 1))
+x_test = np.reshape(x_test, (x_test.shape[0], 28, 28, 1))
+
+# Convert labels to one-hot encoding
+y_train = tf.keras.utils.to_categorical(y_train, 10)
+y_test = tf.keras.utils.to_categorical(y_test, 10)
+
+
+# Define the model architecture
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)),
+    tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+    tf.keras.layers.Flatten(),
     tf.keras.layers.Dense(128, activation='relu'),
     tf.keras.layers.Dense(10, activation='softmax')
 ])
-model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-model.fit(train_images, train_labels, epochs=5)
 
-# Function to generate adversarial examples using FGSM
-def fgsm_attack(model, image, epsilon):
-    image = tf.cast(image, tf.float32)
-    image = tf.expand_dims(image, axis=0)
+# Compile the model
+model.compile(loss=tf.keras.losses.categorical_crossentropy,
+              optimizer=tf.keras.optimizers.legacy.Adam(),
+              metrics=['accuracy'])
 
-    with tf.GradientTape() as tape:
-        tape.watch(image)
-        predictions = model(image)
-        loss = tf.keras.losses.sparse_categorical_crossentropy(test_labels[0], predictions)
+# Create an ART classifier
+classifier = KerasClassifier(model=model, clip_values=(0, 1))
+model.fit(x_train, y_train, batch_size=128, epochs=5, verbose=1)
+x_test_subset = x_test[:100]
+y_test_subset = y_test[:100]
+# Initialize the FGSM attack
+attack = FastGradientMethod(estimator=classifier, eps=0.1)
 
-    gradient = tape.gradient(loss, image)
-    signed_grad = tf.sign(gradient)
-    perturbed_image = image + epsilon * signed_grad
-    perturbed_image = tf.clip_by_value(perturbed_image, 0, 1)
-
-    return perturbed_image.numpy()
-
-# Choose an image for the attack
-image_index = 158
-original_image = test_images[image_index]
-
-# Generate the adversarial example using FGSM
-epsilon = 0.2
-perturbed_image = fgsm_attack(model, original_image, epsilon)
-
-# Plot the original and perturbed images for comparison
-import matplotlib.pyplot as plt
-
-plt.subplot(1, 2, 1)
-plt.imshow(original_image, cmap='gray')
-plt.title("Original Image")
-
-plt.subplot(1, 2, 2)
-plt.imshow(perturbed_image[0], cmap='gray')
-plt.title("Perturbed Image (FGSM)")
-
-plt.show()
-
-# Evaluate the model on the adversarial example
-perturbed_image = tf.squeeze(perturbed_image, axis=0)
-perturbed_image = np.expand_dims(perturbed_image, axis=0)
-predictions = model.predict(perturbed_image)
-predicted_label = np.argmax(predictions)
-
-print("Original Label:", test_labels[image_index])
-print("Predicted Label on Perturbed Image:", predicted_label)
+# Generate adversarial examples
+x_test_adv = attack.generate(x=x_test_subset)
+# Evaluate the accuracy of the classifier on the adversarial examples
+predictions = np.argmax(classifier.predict(x_test_adv), axis=1)
+accuracy = np.sum(predictions == np.argmax(y_test_subset, axis=1)) / len(y_test_subset)
+print("Accuracy on adversarial examples: {:.2f}%".format(accuracy * 100))
