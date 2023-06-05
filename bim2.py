@@ -38,3 +38,4 @@ x_test_adv = attack.generate(x=x_test)
 accuracy = np.sum(np.argmax(classifier.predict(x=x_test_adv), axis=1) == np.argmax(y_test, axis=1)
 ) / len(y_test)
 print(f"Accuracy on adversarial examples: {accuracy * 100:.2f}%")
+    

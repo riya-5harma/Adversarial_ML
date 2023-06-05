@@ -6,10 +6,18 @@ from art.utils import load_mnist
 
 tf.compat.v1.disable_eager_execution()
 # Step 2: Load the MNIST dataset
+
 (x_train, y_train), (x_test, y_test), min_pixel_value, max_pixel_value = load_mnist()
 
-# Step 3: Define the model
+# Reduce the size of the train dataset
+train_size = 1600  # Replace with your desired train dataset size
+x_train = x_train[:train_size]
+y_train = y_train[:train_size]
 
+# Reduce the size of the test dataset
+test_size = 400  # Replace with your desired test dataset size
+x_test = x_test[:test_size]
+y_test = y_test[:test_size]
 # Define the model architecture
 model = tf.keras.Sequential([
     tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)),
@@ -31,7 +39,7 @@ classifier = KerasClassifier(model=model, clip_values=(0, 1))
 model.fit(x_train, y_train, epochs=5, batch_size=32)
 
 # Step 6: Create the attack instance
-attack = CarliniLInfMethod(classifier=classifier, targeted=True, max_iter=100, eps=0.3, learning_rate=0.01, batch_size=32)
+attack = CarliniLInfMethod(classifier=classifier, targeted=True, max_iter=10,confidence=0.5,learning_rate=0.01,verbose=True,  batch_size=10)
 
 # Step 7: Craft the adversarial examples
 x_test_adv = attack.generate(x=x_test, y=np.argmax(y_test, axis=1))

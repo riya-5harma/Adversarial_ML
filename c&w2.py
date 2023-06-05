@@ -32,7 +32,7 @@ model.fit(x_train, y_train, epochs=5, batch_size=32)
 # Step 6: Create the attack instance
 
 # Step 6: Create the attack instance
-attack = CarliniLInfMethod(classifier=classifier, targeted=True, max_iter=100, eps=0.3, learning_rate=0.01, batch_size=32)
+attack = CarliniLInfMethod(classifier=classifier, targeted=True, max_iter=100,  learning_rate=0.01, batch_size=32)
 
 # Step 7: Craft the adversarial examples
 x_test_adv = attack.generate(x=x_test, y=np.argmax(y_test, axis=1))
