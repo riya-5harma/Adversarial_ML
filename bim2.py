@@ -13,10 +13,6 @@ x_train = np.reshape(x_train, (x_train.shape[0], 28, 28, 1))
 x_test = np.reshape(x_test, (x_test.shape[0], 28, 28, 1))
 
 # Define the PyTorch classifier
-input_shape = (1, 28, 28)
-num_classes = 10
-
-# Define the PyTorch classifier
 model = tf.keras.Sequential([
     tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)),
     tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
@@ -27,7 +23,7 @@ model = tf.keras.Sequential([
 
 # Compile the model
 model.compile(loss=tf.keras.losses.categorical_crossentropy,
-              optimizer=tf.keras.optimizers.legacy.Adam(),
+              optimizer=tf.keras.optimizers.Adam(),
               metrics=['accuracy'])
 
 classifier = KerasClassifier(model=model, clip_values=(0, 1))
@@ -39,7 +35,6 @@ attack = BasicIterativeMethod(estimator=classifier, eps=0.3, eps_step=0.1, max_i
 x_test_adv = attack.generate(x=x_test)
 
 # Evaluate the accuracy of the classifier on the adversarial examples
-accuracy = np.sum(
-    np.argmax(classifier.predict(x=x_test_adv), axis=1) == np.argmax(y_test, axis=1)
+accuracy = np.sum(np.argmax(classifier.predict(x=x_test_adv), axis=1) == np.argmax(y_test, axis=1)
 ) / len(y_test)
 print(f"Accuracy on adversarial examples: {accuracy * 100:.2f}%")
