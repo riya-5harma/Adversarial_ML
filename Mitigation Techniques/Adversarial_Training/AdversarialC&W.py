@@ -47,9 +47,11 @@ attack = CarliniLInfMethod(classifier=classifier, targeted=True, max_iter=10, co
 x_test_adv = attack.generate(x=x_test, y=np.argmax(y_test, axis=1))
 
 # Step 8: Evaluate the attack success
-predictions = np.argmax(classifier.predict(x_test_adv), axis=1)
-accuracy = np.sum(predictions == np.argmax(y_test, axis=1)) / len(y_test)
-print(f"Attack success rate: {accuracy * 100}%")
+preds = np.argmax(classifier.predict(x_test_adv), axis=1)
+
+# Calculate the accuracy
+accuracy = np.sum(preds == y_test) / len(y_test)
+print("Accuracy on adversarial examples: {:.2f}%".format(accuracy * 100))
 # Create the adversarial trainer
 trainer = AdversarialTrainer(classifier, attack)
 
