@@ -32,7 +32,7 @@ model.compile(loss=tf.keras.losses.categorical_crossentropy,
 classifier = KerasClassifier(model=model, clip_values=(0, 1))
 
 # Define the attack
-attack = BasicIterativeMethod(estimator=classifier, eps=0.3, eps_step=0.1, max_iter=40)
+attack = BasicIterativeMethod(estimator=classifier, eps=0.1, eps_step=0.1, max_iter=40)
 
 # # Generate adversarial examples
 x_test_adv = attack.generate(x=x_test)
