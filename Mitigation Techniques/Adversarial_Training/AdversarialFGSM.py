@@ -1,3 +1,4 @@
+
 from art.defences.trainer import AdversarialTrainer
 import numpy as np
 from tensorflow.keras.datasets import mnist
@@ -41,6 +42,13 @@ x_test_subset = x_test[:100]
 y_test_subset = y_test[:100]
 # Initialize the FGSM attack
 attack = FastGradientMethod(estimator=classifier, eps=0.1)
+
+# Generate adversarial examples
+x_test_adv = attack.generate(x=x_test_subset)
+# Evaluate the accuracy of the classifier on the adversarial examples
+predictions = np.argmax(classifier.predict(x_test_adv), axis=1)
+accuracy = np.sum(predictions == np.argmax(y_test_subset, axis=1)) / len(y_test_subset)
+print("Accuracy on adversarial examples: {:.2f}%".format(accuracy * 100))
 
 
 # Adversarial training parameters

@@ -1,49 +1,74 @@
+
 import numpy as np
-from tensorflow.keras.datasets import mnist
+import pandas as pd
 import tensorflow as tf
-from art.attacks.evasion import FastGradientMethod
-from art.estimators.classification import KerasClassifier
+from sklearn.model_selection import train_test_split
+tf.compat.v1.enable_eager_execution()
+# Load the CSV dataset
+dataset_path = "dataset/train.csv"
+df = pd.read_csv(dataset_path)
 
-tf.compat.v1.disable_eager_execution()
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-# Normalize pixel values to the range [0, 1]
-x_train = x_train / 255.0
-x_test = x_test / 255.0
+# Separate features and labels
+X = df.drop(columns=["label"]).values
+y = df["label"].values
 
-# Reshape the data to match the input shape expected by ART (batch size, width, height, channels)
-x_train = np.reshape(x_train, (x_train.shape[0], 28, 28, 1))
-x_test = np.reshape(x_test, (x_test.shape[0], 28, 28, 1))
+# Split the dataset into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Convert labels to one-hot encoding
-y_train = tf.keras.utils.to_categorical(y_train, 10)
-y_test = tf.keras.utils.to_categorical(y_test, 10)
+# Normalize the feature values
+X_train = X_train / 255.0
+X_test = X_test / 255.0
 
-
-# Define the model architecture
-model = tf.keras.Sequential([
-    tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)),
-    tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(128, activation='relu'),
+# Create and train a base model
+model = tf.keras.models.Sequential([
+    tf.keras.layers.Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
     tf.keras.layers.Dense(10, activation='softmax')
 ])
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=5)
 
-# Compile the model
-model.compile(loss=tf.keras.losses.categorical_crossentropy,
-              optimizer=tf.keras.optimizers.legacy.Adam(),
-              metrics=['accuracy'])
+# Function to generate adversarial examples using FGSM
+def fgsm_attack(model, x, epsilon):
+    x = tf.cast(x, tf.float32)
+    x = tf.expand_dims(x, axis=0)
 
-# Create an ART classifier
-classifier = KerasClassifier(model=model, clip_values=(0, 1))
-model.fit(x_train, y_train, batch_size=128, epochs=5, verbose=1)
-x_test_subset = x_test[:100]
-y_test_subset = y_test[:100]
-# Initialize the FGSM attack
-attack = FastGradientMethod(estimator=classifier, eps=0.1)
+    with tf.GradientTape() as tape:
+        tape.watch(x)
+        predictions = model(x)
+        loss = tf.keras.losses.sparse_categorical_crossentropy(y_test[0], predictions)
 
-# Generate adversarial examples
-x_test_adv = attack.generate(x=x_test_subset)
-# Evaluate the accuracy of the classifier on the adversarial examples
-predictions = np.argmax(classifier.predict(x_test_adv), axis=1)
-accuracy = np.sum(predictions == np.argmax(y_test_subset, axis=1)) / len(y_test_subset)
-print("Accuracy on adversarial examples: {:.2f}%".format(accuracy * 100))
+    gradient = tape.gradient(loss, x)
+    signed_grad = tf.sign(gradient)
+    perturbed_x = x + epsilon * signed_grad
+    perturbed_x = tf.clip_by_value(perturbed_x, 0, 1)
+
+    return perturbed_x.numpy()
+
+# Choose an example for the attack (modify as per your dataset)
+example_index = 6
+original_example = X_test[example_index]
+
+# Generate the adversarial example using FGSM
+epsilon = 0.5
+perturbed_example = fgsm_attack(model, original_example, epsilon)
+import matplotlib.pyplot as plt
+# Plot the original and perturbed examples
+plt.subplot(1, 2, 1)
+plt.imshow(original_example.reshape(28, 28), cmap='gray')
+plt.title("Original Example")
+
+plt.subplot(1, 2, 2)
+plt.imshow(perturbed_example.reshape(28, 28), cmap='gray')
+plt.title("Perturbed Example (FGSM)")
+
+plt.tight_layout()
+plt.show()
+
+# Evaluate the model on the adversarial example
+perturbed_example = np.squeeze(perturbed_example, axis=0)
+perturbed_example = np.expand_dims(perturbed_example, axis=0)
+predictions = model.predict(perturbed_example)
+predicted_label = np.argmax(predictions)
+
+print("Original Label:", y_test[example_index])
+print("Predicted Label on Perturbed Example:", predicted_label)
