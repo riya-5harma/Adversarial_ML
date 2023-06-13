@@ -24,7 +24,12 @@ classifier = TensorFlowV2Classifier(
 attack = CarliniLInfMethod(classifier)
 x_adv = attack.generate(x.reshape((1, 224, 224, 3)))
 preds = model.predict(x_adv)
-label = decode_predictions(preds, top=1)[0][0][1]
-original_label = decode_predictions(model.predict(x.reshape((1, 224, 224, 3))), top=1)[0][0][1]
-print(f"Original Label: {original_label}")
-print(f"Adversarial Label: {label}")
+label = decode_predictions(preds, top=3)[0] 
+original_label = decode_predictions(model.predict(x.reshape((1, 224, 224, 3))), top=3)[0]
+print("Original Image Predictions:")
+for class_name, class_description, class_probability in original_label:
+        print(f"- {class_description}: {class_probability:.2%}")
+
+print("\nAdversarial Image Predictions:")
+for class_name, class_description, class_probability in label:
+        print(f"- {class_description}: {class_probability:.2%}")
