@@ -1,32 +1,37 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.applications.resnet50 import ResNet50, decode_predictions, preprocess_input
-from art.attacks.evasion import DeepFool
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input, decode_predictions
+from tensorflow.keras.preprocessing import image
 from art.estimators.classification import KerasClassifier
+from art.attacks.evasion import ProjectedGradientDescent
 from art.utils import get_file
-tf.compat.v1.disable_eager_execution()
-# Load the ResNet50 model
-model = ResNet50(weights='imagenet')
 
 epsilons = [0, .05, .1, .15, .2, .25, .3]
-# Load and preprocess a sample image
-image_path = get_file('sample_image.jpg', 'https://cdn.britannica.com/70/192570-138-848FB7B3/penguin-species-places-Galapagos-Antarctica.jpg?w=800&h=450&c=crop')
-image = tf.keras.preprocessing.image.load_img(image_path, target_size=(224, 224))
-x = tf.keras.preprocessing.image.img_to_array(image)
-x = np.expand_dims(x, axis=0)
-x = preprocess_input(x)
+tf.compat.v1.disable_eager_execution()
+# Load the pre-trained ResNet50 model
+model = ResNet50(weights='imagenet')
 
-# Create an ART classifier
+# Wrap the model with an ART-compatible classifier
 classifier = KerasClassifier(model=model, clip_values=(0, 255))
 
-# Initialize the Deep Fool attack
+# Select an image for the attack
+image_path = get_file('sample_image.jpg', 'https://cdn.britannica.com/70/192570-138-848FB7B3/penguin-species-places-Galapagos-Antarctica.jpg?w=800&h=450&c=crop')
+x = image.load_img(image_path, target_size=(224, 224))
+x = image.img_to_array(x)
+x = np.expand_dims(x, axis=0)
+preprocessed_image = preprocess_input(x)
 
+# Get the true label of the image
+true_label = np.argmax(classifier.predict(x), axis=1)
+classifier = KerasClassifier(model=model, clip_values=(0, 255))
 
-# Generate adversarial examples
+# Create the PGD attack instance
+
 
 for epss in epsilons:
-    attack = DeepFool(classifier,epsilon=epss)
-    adversarial_image = attack.generate(x)  
+    
+    attack = ProjectedGradientDescent(estimator=classifier, eps=epss, eps_step=0.1, max_iter=100, targeted=False)
+    adversarial_image = attack.generate(x=preprocessed_image)  
     preds_original = classifier.predict(x)
     preds_adv = classifier.predict(adversarial_image)
     original_label = decode_predictions(preds_original, top=3)[0]
