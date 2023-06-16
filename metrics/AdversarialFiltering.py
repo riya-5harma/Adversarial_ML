@@ -17,7 +17,7 @@ image = img_to_array(image)
 # Preprocess the image
 preprocessed_image = preprocess_input(np.expand_dims(image, axis=0))
 
-# Load the pre-trained ResNet50 model
+# Load the pre-trained Xception model
 model = Xception(weights='imagenet')
 
 # Create a KerasClassifier instance
@@ -27,18 +27,24 @@ classifier = KerasClassifier(model=model, clip_values=(-1.0, 1.0))
 original_preds = classifier.predict(preprocessed_image)
 original_label = decode_predictions(original_preds, top=1)[0][0][1]
 
+def confidence_difference(original_preds, adversarial_preds):
+    original_confidence = np.max(original_preds)
+    adversarial_confidence = np.max(adversarial_preds)
+    return original_confidence - adversarial_confidence
 
 for epss in epsilons:
     attack = FastGradientMethod(estimator=classifier, eps=epss)
-    adversarial_image = attack.generate(x=preprocessed_image) 
-   
-    original_preds = classifier.predict(preprocessed_image)
+    adversarial_image = attack.generate(x=preprocessed_image)
 
+    original_preds = classifier.predict(preprocessed_image)
     adversarial_preds = classifier.predict(adversarial_image)
+
     original_label = decode_predictions(original_preds, top=3)[0]
     adversarial_label = decode_predictions(adversarial_preds, top=3)[0]
-    
-    print("\nFor Perturbation Value : ",epss)
+
+    confidence_diff = confidence_difference(original_preds, adversarial_preds)
+
+    print("\nFor Perturbation Value:", epss)
     print("\nTrue Label:")
     for class_name, class_description, class_probability in original_label:
         print(f"- {class_description}: {class_probability:.2%}")
@@ -46,3 +52,5 @@ for epss in epsilons:
     print("\nAdversarial Label:")
     for class_name, class_description, class_probability in adversarial_label:
         print(f"- {class_description}: {class_probability:.2%}")
+
+    print("\nConfidence Difference:", confidence_diff)
