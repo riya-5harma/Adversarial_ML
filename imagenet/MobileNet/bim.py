@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.applications.mobilenet import MobileNet, preprocess_input, decode_predictions
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input, decode_predictions
 from tensorflow.keras.preprocessing import image
 from art.estimators.classification import KerasClassifier
 from art.attacks.evasion import BasicIterativeMethod
@@ -9,7 +9,7 @@ from art.utils import to_categorical,get_file
 epsilons = [0, .05, .1, .15, .2, .25, .3]
 tf.compat.v1.disable_eager_execution()
 # Load the pre-trained ResNet50 model
-model = MobileNet(weights='imagenet')
+model = ResNet50(weights='imagenet')
 
 # Wrap the model with an ART-compatible classifier
 classifier = KerasClassifier(model=model, clip_values=(0, 255))
